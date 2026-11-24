@@ -1,3 +1,12 @@
+import sys
+
+# Linux cloud compatibility shim for ChromaDB's SQLite requirement
+try:
+    __import__("pysqlite3")
+    sys.modules["sqlite3"] = sys.modules.pop("pysqlite3")
+except ImportError:
+    pass
+
 import hashlib
 import io
 import os
@@ -27,26 +36,22 @@ st.markdown(
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
-    /* Global Font & Clean Background */
     html, body, [class*="css"] {
         font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
     }
 
-    /* Hide default Streamlit branding & top decoration bar */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header[data-testid="stHeader"] {
         background: transparent;
     }
 
-    /* Main Workspace Container */
     .block-container {
         padding-top: 1.5rem !important;
         padding-bottom: 4rem !important;
         max-width: 920px;
     }
 
-    /* Sidebar Styling */
     section[data-testid="stSidebar"] {
         background-color: #0d1117;
         border-right: 1px solid rgba(255, 255, 255, 0.08);
@@ -55,7 +60,6 @@ st.markdown(
         padding-top: 1.5rem !important;
     }
 
-    /* Brand Header in Sidebar */
     .sidebar-brand {
         display: flex;
         align-items: center;
@@ -88,7 +92,6 @@ st.markdown(
         color: #94a3b8;
     }
 
-    /* Hero Glass Card */
     .hero-wrapper {
         position: relative;
         background: radial-gradient(circle at top right, rgba(99, 102, 241, 0.18), transparent 55%),
@@ -128,7 +131,6 @@ st.markdown(
         line-height: 1.55;
     }
 
-    /* 4-Column Metric Grid inside Hero */
     .metric-grid {
         display: grid;
         grid-template-columns: repeat(4, 1fr);
@@ -159,7 +161,6 @@ st.markdown(
         text-overflow: ellipsis;
     }
 
-    /* Starter Prompt Cards */
     div.stButton > button {
         background: rgba(22, 27, 34, 0.9) !important;
         border: 1px solid rgba(255, 255, 255, 0.10) !important;
@@ -181,7 +182,6 @@ st.markdown(
         box-shadow: 0 8px 20px rgba(99, 102, 241, 0.18) !important;
     }
 
-    /* Chat Message Containers */
     div[data-testid="stChatMessage"] {
         background: rgba(22, 27, 34, 0.65);
         border: 1px solid rgba(255, 255, 255, 0.07);
@@ -190,7 +190,6 @@ st.markdown(
         margin-bottom: 0.85rem;
     }
 
-    /* Source Citation Cards */
     .source-card {
         background: rgba(13, 17, 23, 0.85);
         border: 1px solid rgba(255, 255, 255, 0.08);
@@ -249,13 +248,13 @@ with st.sidebar:
 
     if env_key:
         api_key = env_key
-        st.success("🔒 Authenticated via `.env`")
+        st.success("🔒 Authenticated via server secrets")
     else:
         api_key = st.text_input(
             "Gemini API Key",
             type="password",
             placeholder="AIzaSy...",
-            help="Enter a Google AI Studio API key.",
+            help="Enter a free Google AI Studio API key.",
         )
 
     st.markdown("#### 📂 Document Source")
@@ -337,6 +336,10 @@ def extract_and_chunk_pdf(file_bytes: bytes, chunk_size: int = 2500, overlap: in
 chroma_client = chromadb.PersistentClient(path="./chroma_db")
 embed_fn = GeminiEmbeddingFunction(model_name="gemini-embedding-001")
 
+collection = None
+active_doc_name = "No PDF loaded"
+is_custom_upload = False
+
 if uploaded_file is not None:
     file_bytes = uploaded_file.getvalue()
     file_hash = hashlib.md5(file_bytes).hexdigest()[:10]
@@ -369,12 +372,10 @@ else:
             name="book_knowledge", embedding_function=embed_fn
         )
         active_doc_name = "sample.pdf"
-        is_custom_upload = False
     except Exception:
-        st.error("Default `./chroma_db` index not found. Upload a PDF in the sidebar to begin!")
-        st.stop()
+        collection = None
 
-chunk_count = collection.count()
+chunk_count = collection.count() if collection is not None else 0
 
 # --- MODEL DISCOVERY & SMART CACHING ---
 if "model_chain" not in st.session_state:
@@ -432,6 +433,10 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
+
+if collection is None:
+    st.info("👈 Upload any **PDF document** in the left sidebar to index it and start asking questions!")
+    st.stop()
 
 # --- RENDER CITATION CARDS ---
 def render_sources(sources: list[str]):
