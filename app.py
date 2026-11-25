@@ -1,4 +1,4 @@
-import sys
+﻿import sys
 
 # Linux cloud compatibility shim for ChromaDB's SQLite requirement
 try:
@@ -498,10 +498,10 @@ user_query = st.chat_input("Message DocuMind AI...") or selected_starter
 
 if user_query:
     st.session_state.messages.append({"role": "user", "content": user_query})
-    with st.chat_message("user", avatar="👤"):
+    with st.chat_message("user", avatar="✨"):
         st.markdown(user_query)
 
-    with st.chat_message("assistant", avatar="◈"):
+    with st.chat_message("assistant", avatar="✨"):
         t0 = time.time()
         with st.spinner("Retrieving relevant passages & verifying answer..."):
             results = collection.query(query_texts=[user_query], n_results=top_k)
